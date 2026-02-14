@@ -5,11 +5,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-// document.getElementById('generate').addEventListener('click', function() {
-//     console.log('Read button clicked');
-//     chrome.runtime.sendMessage({ action: "readText" });
-// });
-
 chrome.runtime.onMessage.addListener(function(request, sender) {
     if (request.action === "updateUI") {
         const loadingText = document.getElementById("loading");

@@ -1,43 +1,5 @@
 console.log("window.js loaded");
 
-
-// No longer needed as textfield isnt updated anymore
-// chrome.runtime.onMessage.addListener(function(request, sender) {
-//     console.log("request received: " + JSON.stringify(request));
-//     console.log("action received: " + request.action);
-//     if (request.action == "getMessage") {
-//         const typedMessageDiv = document.getElementById("typedMessage");
-//         if (request.message) {
-//             console.log("User is typing request: " + request.message);
-//             typedMessageDiv.textContent = "User is typing: " + request.message;
-//         } else {
-//             console.log("No message found.");
-//             typedMessageDiv.textContent = "No message found.";
-//         }
-//     } 
-// });
-
-// No longer needed as not listening
-// document.addEventListener('DOMContentLoaded', function() {
-//     const closeButton = document.getElementById('closeButton');
-//     if (closeButton) {
-//         closeButton.addEventListener('click', function() {
-//             console.log("Close button clicked message received in window.js.");
-//             chrome.runtime.sendMessage({ action: "removeIframe" });
-//         });
-//     }
-
-    
-//     const readButton = document.getElementById('readButton');
-//     if (readButton) {
-//         readButton.addEventListener('click', function() {
-//             console.log("Read button clicked message received in window.js.");
-//             readTextField();
-//         });
-//     }
-// });
-    
-
 function readTextField() {
     // Find the discord message input field
     chrome.tabs.query({ active: true, currentWindow: true }, tabs => {

@@ -4,7 +4,8 @@ import requests
 from PIL import Image
 from io import BytesIO
 
-GEMINI_API_KEY = "AIzaSyDtiSA5fT6kdkjddNdVmuZu1RCGBY2ksX8"
+with open("apikey.txt", "r") as file:
+    GEMINI_API_KEY = file.read().strip()
 
 DRAFT_INSTRUCT = """
     You are the AI browser extension 'Wingman' that is given the user's chat history, the user's
@@ -82,13 +83,12 @@ DESCRIBE_IMG_INSTRUCT = """
     """
 
 def gemini_transcribe(filename: str):
-    client = genai.Client(api_key="AIzaSyByfScdoYEExsECaBOvaHqXEgOfI19uBOA")
 
     myfile = client.files.upload(file=filename)
     prompt = 'Generate a transcript of the speech.'
 
     response = client.models.generate_content(
-      model='gemini-2.0-flash',
+      model='gemini-3-flash-preview',
       contents=[prompt, myfile]
     )
 
@@ -104,7 +104,7 @@ def describe_image(url: str) -> str:
             image = Image.open(BytesIO(response.content))
 
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-3-flash-preview",
                 contents=["Give a description of this image", image],
                 config=types.GenerateContentConfig(
                     system_instruction=types.Part.from_text(text=DESCRIBE_IMG_INSTRUCT),
@@ -115,10 +115,6 @@ def describe_image(url: str) -> str:
                     top_k=40
                 )
             )
-
-            # Save the image as a JPG file
-            # image.save("image.jpg", "JPEG")
-            # print("Image saved as image.jpg")
             return response.text
         else:
             print("Failed to retrieve the image. Status code:", response.status_code)
@@ -154,14 +150,19 @@ def generate_rizz(relationship, chat_history, draft=None) -> str:
 
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
-        model_id = "gemini-2.0-flash"
+        model_id = "gemini-3-flash-preview"
         response = client.models.generate_content(
             model=model_id,
-            contents=types.Content(role="user", parts=[types.Part.from_text(text=prompt)]),
+            contents=[types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=prompt)]
+            )],
             config=types.GenerateContentConfig(
-                system_instruction=types.Part.from_text(text=DRAFT_INSTRUCT if draft else NO_DRAFT_INSTRUCT),
+                system_instruction=types.Part.from_text(
+                    text=DRAFT_INSTRUCT if draft else NO_DRAFT_INSTRUCT
+                ),
                 temperature=1.5,
-                max_output_tokens=100,
+                max_output_tokens=600,
                 response_mime_type="text/plain",
                 top_p=0.95,
                 top_k=40

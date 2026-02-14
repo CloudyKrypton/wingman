@@ -18,12 +18,12 @@ def rizzify():
     current_message = data.get('current_message')
     if current_message is None:
         current_message = ""
-    print("Cur msg: " + "Cur msg: " + current_message)
+    print("Cur msg: " + current_message)
 
     chat_history_json = data.get('chat_history')[-10:]
     if chat_history_json is None:
         chat_history_json = []
-    
+
     chat_history = []
     for msg in chat_history_json:
         if msg.get('imageSrc') is not None and msg.get('imageSrc') != '':
@@ -34,6 +34,7 @@ def rizzify():
     print(chat_history)
     
     return_msg = generate_rizz(relationship, chat_history, current_message)
+    print("return: " + return_msg)
     if return_msg is None:
         return jsonify({"status": "error", "msg": "Failed to generate a message."})
     else:
