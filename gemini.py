@@ -17,9 +17,13 @@ DRAFT_INSTRUCT = """
     draft message that is interesting, engaging, and thoughtful. The generated message should be is 
     appropriate for the user's relationship with the recipient and prioritize responding to or
     expanding upon relevant and recent messages. and imitate the user's texting conventions.
-
+    You are given a biography about the recipient in a string that you may use in generating your response,
+    though most of the time you will not need to use it.
+    
     Example Input 1:
     Relationship: girlfriend
+    clkr's biography: Plays Animal Crossing,Likes jazz,Likes chocolate
+    Generate a message as: user
     Chat History
     clkr: i'm at the library lol
     user: okay, I'll see you there
@@ -32,6 +36,8 @@ DRAFT_INSTRUCT = """
 
     Example Input 2:
     Relationship: co-worker
+    john's biography: Overworks themself,Worries
+    Generate a message as: user
     Chat History:
     user: Hi John, are you done with the implementing the new feature?
     john: I finished a few minutes ago! I'll send you the code now.
@@ -42,11 +48,13 @@ DRAFT_INSTRUCT = """
 
     Example Input 3:
     Relationship: friend
+    pam's biography: Values animation and story,Loves Arcane
+    Generate a message as: user
     Chat History:
-    friend: dude, did you see the trailer for Arcane?
+    pam: dude, did you see the trailer for Arcane?
     user: YO hold up
     user: I'm watching it rn 
-    friend: Fortiche went crazy on the animation fr
+    pam: Fortiche went crazy on the animation fr
     Draft Message: yeah, it looks so good
 
     Example Output 3:
@@ -58,9 +66,12 @@ NO_DRAFT_INSTRUCT = """
     in a way that is appropriate for the user's relationship with the recipient. The message should
     prioritize responding to or expanding upon relevant and recent messages. Your message should 
     imitate the user's texting conventions.
+    You are given a biography about the recipient in a string that you may use in generating your response,
+    though most of the time you will not need to use it.
 
     Example Input 1:
     Relationship: girlfriend
+    clkr's biography: Plays Animal Crossing,Likes jazz,Likes chocolate
     Generate a message as: alex
     Chat History:
     alex: yo bb girl, wya?
@@ -73,6 +84,7 @@ NO_DRAFT_INSTRUCT = """
 
     Example Input 2:
     Relationship: co-worker
+    john's biography: Overworks themself,Worries
     Generate a message as: emily
     Chat History:
     emily: Hi John, did you finish writing the docstrings?
@@ -207,15 +219,16 @@ def update_description(chat_history: list[dict[str, str]], my_user: str,
             )
         )
     except Exception as e:
-        return str(e)
+        print(str(e))
+        return None
     
     print("New history: " + response.text + "\n")
     update_context(my_user, other_user, response.text)
-    return None
+    return response.text
 
 
-def generate_rizz(relationship: str, chat_history: list[dict[str, str]], 
-                  my_user: str, draft: Optional[str] = None) -> str:
+def generate_rizz(relationship: str, chat_history: list[dict[str, str]], new_hist: str,
+                  my_user: str, other_user: str, draft: Optional[str] = None) -> str:
     """
     Generate a message that continues the conversation in a way that is appropriate for the user's
     relationship with the recipient. The message should consider relevant information in the chat
@@ -223,13 +236,17 @@ def generate_rizz(relationship: str, chat_history: list[dict[str, str]],
     message should be an improved, more engaging version of the draft message.
 
     Parameters:
+        relationship: The user's relationship to the recipient.
+        new_hist: Information about the recipient.
+        my_user: The user's (sender) username.
+        other_user: The recipient's username.
         chat_history (list of dictionaries):
             An ordered list of messages in the chat history. Each dictionary corresponds to a
             message and has the following keys:
             - "type": The type of message, which can be "text" or "image"
             - "sender": The sender of the message.
             - "content": The message content.
-        relationship (str): The user's relationship to the recipient.
+        draft: The current drafted message.
     
     Returns the response string on success, None on error.
     """
@@ -237,9 +254,9 @@ def generate_rizz(relationship: str, chat_history: list[dict[str, str]],
     chat_history_string = _process_chat_history(chat_history)
 
     if draft:
-        prompt = f"Relationship: {relationship}\nGenerate a message as: {my_user}\nChat History:\n{chat_history_string}\nDraft Message: {draft}"
+        prompt = f"Relationship: {relationship}\nGenerate a message as: {my_user}\n{other_user}'s biography: {new_hist}\nChat History:\n{chat_history_string}\nDraft Message: {draft}"
     else:
-        prompt = f"Relationship: {relationship}\nGenerate a message as: {my_user}\nChat History:\n{chat_history_string}"
+        prompt = f"Relationship: {relationship}\nGenerate a message as: {my_user}\n{other_user}'s biography: {new_hist}\nChat History:\n{chat_history_string}"
     
     print(prompt)
 

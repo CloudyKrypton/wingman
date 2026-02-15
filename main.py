@@ -52,11 +52,9 @@ def rizzify():
     print(f'Me: {my_user}, Other user: {other_user}')
 
     # TODO: Does the frontend handle this error?
-    err = update_description(chat_history, my_user, other_user)
-    if err != None:
-        return jsonify({"status": "error", "msg": err})
+    new_hist = update_description(chat_history, my_user, other_user)
     
-    return_msg = generate_rizz(relationship, chat_history, my_user, current_message)
+    return_msg = generate_rizz(relationship, chat_history, new_hist, my_user, other_user, current_message)
     print("return: " + return_msg)
     if return_msg is None:
         return jsonify({"status": "error", "msg": "Failed to generate a message."})
