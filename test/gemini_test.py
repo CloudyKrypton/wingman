@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from gemini import _describe_image, generate_rizz
+from gemini import _describe_image, generate_rizz, update_description
 
 def test_describe_image():
     url = "https://instagram.fphl1-1.fna.fbcdn.net/v/t51.2885-15/485067168_18512192929008508_1371499067344772488_n.jpg?stp=dst-jpg_e35_s1080x1080_sh0.08_tt6&_nc_ht=instagram.fphl1-1.fna.fbcdn.net&_nc_cat=1&_nc_oc=Q6cZ2QHfDdt2gmQXKGZWgsu0AM3kWkB7FR0i62UNg74Z7zHh3SujFP9XKgIVapHeOXzlLDA&_nc_ohc=k2Jj_uOWwRUQ7kNvgEkCb1E&_nc_gid=zfCi6Rj8DV2VcmDLBgC0sA&edm=ANTKIIoBAAAA&ccb=7-5&oh=00_AYH4ydwuNgQeQhH2fG5dVy45wKqdN0hNExkKc1MtSuTjgw&oe=67E4EE2E&_nc_sid=d885a2"
@@ -35,7 +35,17 @@ def test_generate_rizz_advanced():
     response = generate_rizz(test_relationship, test_chat_history, "user")
     print(response)
 
+def test_update_description():
+    test_chat_history = [
+        {"type": "text", "sender": "user", "content": "ayyy the new Avengers movie came out!"},
+        {"type": "text", "sender": "clkr", "content": "omg ya I saw!"},
+        {"type": "text", "sender": "clkr", "content": "I can't wait to watch it"}
+    ]
+
+    update_description(test_chat_history, "user", "clkr")
+
 if __name__ == "__main__":
     test_generate_rizz()
     test_describe_image()
     test_generate_rizz_advanced()
+    test_update_description()

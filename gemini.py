@@ -9,6 +9,8 @@ from typing import Optional
 with open("apikey.txt", "r") as file:
     GEMINI_API_KEY = file.read().strip()
 
+client = genai.Client(api_key=GEMINI_API_KEY)
+
 DRAFT_INSTRUCT = """
     You are the AI browser extension 'Wingman' that is given the user's chat history, the user's
     relationship to the recipient, and the user's draft message. Generate an improved version of the
@@ -87,8 +89,9 @@ DESCRIBE_IMG_INSTRUCT = """
     """
 GENERATE_HIST_INSTRUCT = """
     You are given a small snippet of a conversation between two people with no prior context.
-    Generate 1-3 points for the specified person, related to facts they shared (e.g., name, 
-    preferences, hobbies). The goal is to eventually build persistent memory about this person in a string.
+    Generate 1-3 points for the specified person (e.g., name, preferences, hobbies), 
+    related to facts they shared, with 5 words max in each point. The goal is to eventually build 
+    persistent memory about this person in a string.
 
     Example Input 1:
     Generate memory for: Alex
@@ -102,7 +105,7 @@ GENERATE_HIST_INSTRUCT = """
     Example Output 1:
     Likes hiking,
     Open to moderately challenging trails,
-    Plans and brings snacks for friends
+    Brings snacks for friends
 
     Example Input 2:
     Generate memory for: Riley
@@ -115,17 +118,18 @@ GENERATE_HIST_INSTRUCT = """
 
     Example Output 2:
     Curious and responsive,
-    Engages with humor and asks follow-up questions
+    Engages with humor
     """
 UPDATE_HIST_INSTRUCT = """
     You are given a small snippet of a conversation between two people with some points of prior context.
-    Update the prior context for the specified person (keeping it at 3 points maximum), related to facts they shared 
-    (e.g., name, preferences, hobbies). Prioritize specific details, such as hobbies, over more abstract
-    descriptions. The goal is to eventually build persistent memory about this person in a string.
+    Update the prior context for the specified person (keeping it at 3 points maximum, with 5 words max in each point), 
+    related to facts they shared (e.g., name, preferences, hobbies). Prioritize specific details, 
+    such as hobbies, over more abstract descriptions. The goal is to eventually build persistent 
+    memory about this person in a string.
 
     Example Input 1:
     Update memory for: Alex
-    Previous context: Likes hiking,Open to moderately challenging trails,Plans and brings snacks for friends
+    Previous context: Likes hiking,Open to moderately challenging trails,Brings snacks for friends
     Chat history:
     Alex: Tried making homemade pasta tonight. Disaster
     Jordan: Haha! What happened?
@@ -140,7 +144,7 @@ UPDATE_HIST_INSTRUCT = """
 
     Example Input 2:
     Generate memory for: Riley
-    Previous context: Curious and responsive,Engages with humor and asks follow-up questions
+    Previous context: Curious and responsive,Engages with humor
     Riley: finally got my hands on that new lens!
     Sam: nice
     Sam: which one did u get?
@@ -174,15 +178,17 @@ def update_description(chat_history: list[dict[str, str]], my_user: str,
     Returns an error string on error, None otherwise.
     """
     chat_history_string = _process_chat_history(chat_history)
+    print("Checking SQL database for history...")
     old_hist_exists = exists_context(my_user, other_user)
     if not old_hist_exists:
         prompt = f"Generate memory for: {other_user}\nChat History:\n{chat_history_string}"
     else:
         old_hist = get_context(my_user, other_user)
         prompt = f"Generate memory for: {other_user}\nPrevious Context: {old_hist}\nChat History:\n{chat_history_string}"
+    
+    print("Sending update history request to Gemini...")
     try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        model_id = "gemini-3-flash-preview"
+        model_id = "gemini-2.5-flash"
         response = client.models.generate_content(
             model=model_id,
             contents=[types.Content(
@@ -191,9 +197,9 @@ def update_description(chat_history: list[dict[str, str]], my_user: str,
             )],
             config=types.GenerateContentConfig(
                 system_instruction=types.Part.from_text(
-                    text=UPDATE_HIST_INSTRUCT if exists_context else GENERATE_HIST_INSTRUCT
+                    text=UPDATE_HIST_INSTRUCT if old_hist_exists else GENERATE_HIST_INSTRUCT
                 ),
-                temperature=1.5,
+                temperature=0.5,
                 max_output_tokens=800,
                 response_mime_type="text/plain",
                 top_p=0.95,
@@ -203,7 +209,7 @@ def update_description(chat_history: list[dict[str, str]], my_user: str,
     except Exception as e:
         return str(e)
     
-    print(response.text)
+    print("New history: " + response.text + "\n")
     update_context(my_user, other_user, response.text)
     return None
 
@@ -238,8 +244,7 @@ def generate_rizz(relationship: str, chat_history: list[dict[str, str]],
     print(prompt)
 
     try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        model_id = "gemini-3-flash-preview"
+        model_id = "gemini-2.5-flash"
         response = client.models.generate_content(
             model=model_id,
             contents=[types.Content(
@@ -275,7 +280,6 @@ def _describe_image(url: str) -> str:
     Returns a response string on success, None on error.
     """
     try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
         response = requests.get(url)
 
         if response.status_code == 200:
@@ -283,7 +287,7 @@ def _describe_image(url: str) -> str:
             image = Image.open(BytesIO(response.content))
 
             response = client.models.generate_content(
-                model="gemini-3-flash-preview",
+                model="gemini-2.5-flash",
                 contents=["Give a description of this image", image],
                 config=types.GenerateContentConfig(
                     system_instruction=types.Part.from_text(text=DESCRIBE_IMG_INSTRUCT),

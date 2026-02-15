@@ -22,8 +22,6 @@ def exists_context(my_user, other_user) -> bool:
             user_id=my_user,
             friend_id=other_user
         ).first()
-        print(entry)
-        print(entry is not None)
         return entry is not None
 
 def get_context(my_user, other_user):

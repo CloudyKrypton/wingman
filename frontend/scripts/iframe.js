@@ -1,3 +1,6 @@
+/**
+ * Initializes iframe UI event listeners once the DOM is loaded.
+ */
 document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('close').addEventListener('click', function() {
         console.log('Close button clicked');
@@ -5,6 +8,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
+/**
+ * Listens for messages from the background or content scripts
+ * to update the iframe UI state.
+ */
 chrome.runtime.onMessage.addListener(function(request, sender) {
     if (request.action === "updateUI") {
         const loadingText = document.getElementById("loading");

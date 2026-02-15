@@ -1,5 +1,16 @@
-// Handles the "Generate" button and chat scraping
-
+/**
+ * Handles the "Generate" button and chat scraping.
+ * 
+ * Sends the payload to a local backend endpoint (`/rizzify`) via POST.
+ * Relays success or error status back to the extension to update the UI.
+ * 
+ * Notes:
+ * - Requires "activeTab" and "scripting" permissions in the Chrome extension manifest.
+ * - Assumes the backend server is running locally at http://127.0.0.1:8000.
+ * - Must be triggered by user interaction (button click).
+ * 
+ * @async
+ */
 async function prepForRizz() {
   const generateButton = document.getElementById("generate");
   const rizzBox = document.getElementById("rizzbox");
@@ -20,6 +31,7 @@ async function prepForRizz() {
     // Show loading text
     if (loadingText) loadingText.style.display = "block";
 
+    // Retrieve relationship from input
     relationship = relationshipSelect ? relationshipSelect.value : "acquaintance";
     console.log("Relationship:", relationship);
 

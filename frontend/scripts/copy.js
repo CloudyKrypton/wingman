@@ -1,10 +1,19 @@
-// Handles the copy button
-
+/**
+ * Initializes clipboard copy functionality once the DOM is fully loaded.
+ * Requirements:
+ * - Must be triggered by a user interaction (click) for clipboard access.
+ * - Clipboard API typically requires a secure context (HTTPS).
+ * 
+ * @listens DOMContentLoaded 
+ */
 document.addEventListener("DOMContentLoaded", () => {
     const copyButton = document.getElementById("copyButton");
     const suggestionBox = document.getElementById("suggestion");
 
-    if (!copyButton || !suggestionBox) return;
+    if (!copyButton || !suggestionBox) {
+        console.log("Missing copy button or suggestion box")
+        return;
+    }
 
     copyButton.style.cursor = "pointer";
 

@@ -1,5 +1,12 @@
 console.log("background.js running");
 
+/**
+ * Retrieves the URL of a Chrome tab by its ID.
+ *
+ * @param {number} tabId - The ID of the tab whose URL should be retrieved.
+ * @param {(url: string|null) => void} callback - Function invoked with the
+ *        tab's URL on success, or `null` if an error occurs.
+ */
 function getTabUrl(tabId, callback) {
     chrome.tabs.get(tabId, (tab) => {
         if (chrome.runtime.lastError) {
@@ -11,6 +18,16 @@ function getTabUrl(tabId, callback) {
     });
 }
 
+/**
+ * Injects a floating iframe into the specified browser tab.
+ * The iframe is positioned in the bottom-right corner of the page
+ * with a high z-index to ensure visibility above page content.
+ *
+ * @param {number} tabId - The ID of the tab where the iframe should be injected.
+ *
+ * @requires "scripting" permission in manifest.json
+ * @requires "activeTab" or host permissions for the target page
+ */
 function injectFloatingIframe(tabId) {
     console.log("Injecting floating iframe.");
     
