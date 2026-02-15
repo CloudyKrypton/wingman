@@ -3,7 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://postgres.fodqpioubienwwkvbwvy:GKjgXbQYAHzj2aJc@aws-0-us-west-2.pooler.supabase.com:6543/postgres"
+with open("sqluri.txt", "r") as file:
+    app.config["SQLALCHEMY_DATABASE_URI"] = file.read().strip()
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)

@@ -4,6 +4,7 @@ import requests
 from PIL import Image
 from io import BytesIO
 from sql import exists_context, get_context, update_context
+from typing import Optional
 
 with open("apikey.txt", "r") as file:
     GEMINI_API_KEY = file.read().strip()
@@ -151,7 +152,128 @@ UPDATE_HIST_INSTRUCT = """
     Enjoys photography
     """
 
-def describe_image(url: str) -> str:
+
+def update_description(chat_history: list[dict[str, str]], my_user: str, 
+                       other_user: str) -> Optional[str]:
+    """
+    Updates the persistent memory description for the person that the user is chatting with.
+    Checks if such a description exists, and if not, creates a new entry for one.
+    Communicates with sql.py to accomplish database management, and formats a Gemini
+    request to generate the description.
+    
+    Parameters:
+    - chat_history (list of dictionaries):
+        An ordered list of messages in the chat history. Each dictionary corresponds to a
+        message and has the following keys:
+        - "type": The type of message, which can be "text" or "image"
+        - "sender": The sender of the message.
+        - "content": The message content.
+    - my_user: the client's username
+    - other_user: the username of the other user the client is chatting with
+
+    Returns an error string on error, None otherwise.
+    """
+    chat_history_string = _process_chat_history(chat_history)
+    old_hist_exists = exists_context(my_user, other_user)
+    if not old_hist_exists:
+        prompt = f"Generate memory for: {other_user}\nChat History:\n{chat_history_string}"
+    else:
+        old_hist = get_context(my_user, other_user)
+        prompt = f"Generate memory for: {other_user}\nPrevious Context: {old_hist}\nChat History:\n{chat_history_string}"
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        model_id = "gemini-3-flash-preview"
+        response = client.models.generate_content(
+            model=model_id,
+            contents=[types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=prompt)]
+            )],
+            config=types.GenerateContentConfig(
+                system_instruction=types.Part.from_text(
+                    text=UPDATE_HIST_INSTRUCT if exists_context else GENERATE_HIST_INSTRUCT
+                ),
+                temperature=1.5,
+                max_output_tokens=800,
+                response_mime_type="text/plain",
+                top_p=0.95,
+                top_k=40
+            )
+        )
+    except Exception as e:
+        return str(e)
+    
+    print(response.text)
+    update_context(my_user, other_user, response.text)
+    return None
+
+
+def generate_rizz(relationship: str, chat_history: list[dict[str, str]], 
+                  my_user: str, draft: Optional[str] = None) -> str:
+    """
+    Generate a message that continues the conversation in a way that is appropriate for the user's
+    relationship with the recipient. The message should consider relevant information in the chat
+    history and imitate the user's texting conventions. If a draft message is provided, the generated
+    message should be an improved, more engaging version of the draft message.
+
+    Parameters:
+        chat_history (list of dictionaries):
+            An ordered list of messages in the chat history. Each dictionary corresponds to a
+            message and has the following keys:
+            - "type": The type of message, which can be "text" or "image"
+            - "sender": The sender of the message.
+            - "content": The message content.
+        relationship (str): The user's relationship to the recipient.
+    
+    Returns the response string on success, None on error.
+    """
+
+    chat_history_string = _process_chat_history(chat_history)
+
+    if draft:
+        prompt = f"Relationship: {relationship}\nGenerate a message as: {my_user}\nChat History:\n{chat_history_string}\nDraft Message: {draft}"
+    else:
+        prompt = f"Relationship: {relationship}\nGenerate a message as: {my_user}\nChat History:\n{chat_history_string}"
+    
+    print(prompt)
+
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        model_id = "gemini-3-flash-preview"
+        response = client.models.generate_content(
+            model=model_id,
+            contents=[types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=prompt)]
+            )],
+            config=types.GenerateContentConfig(
+                system_instruction=types.Part.from_text(
+                    text=DRAFT_INSTRUCT if draft else NO_DRAFT_INSTRUCT
+                ),
+                temperature=1.5,
+                max_output_tokens=800,
+                response_mime_type="text/plain",
+                top_p=0.95,
+                top_k=40
+            )
+        )
+    except Exception as e:
+        print("Error:", e)
+        return None
+    
+    return response.text
+
+
+def _describe_image(url: str) -> str:
+    """
+    Helper function that returns a description of the image given by the url using 
+    Gemini image recognition. Formats an API request to send to Gemini.
+    
+    Parameters:
+    - url: a valid url pointing to an image.
+
+    Returns a response string on success, None on error.
+    """
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
         response = requests.get(url)
@@ -175,139 +297,33 @@ def describe_image(url: str) -> str:
             return response.text
         else:
             print("Failed to retrieve the image. Status code:", response.status_code)
+            return None
     
     except Exception as e:
-        return str(e)
-
-def update_description(chat_history, my_user, other_user):
-    chat_history_string = process_chat_history(chat_history)
-    old_hist_exists = exists_context(my_user, other_user)
-    if not old_hist_exists:
-        prompt = f"Generate memory for: {other_user}\nChat History:\n{chat_history_string}"
-    else:
-        old_hist = get_context(my_user, other_user)
-        prompt = f"Generate memory for: {other_user}\nPrevious Context: {old_hist}\nChat History:\n{chat_history_string}"
-    try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        model_id = "gemini-3-flash-preview"
-        response = client.models.generate_content(
-            model=model_id,
-            contents=[types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=prompt)]
-            )],
-            config=types.GenerateContentConfig(
-                system_instruction=types.Part.from_text(
-                    text=UPDATE_HIST_INSTRUCT if exists_context else GENERATE_HIST_INSTRUCT
-                ),
-                temperature=1.5,
-                max_output_tokens=600,
-                response_mime_type="text/plain",
-                top_p=0.95,
-                top_k=40
-            )
-        )
-    except Exception as e:
-        print("Error:", e)
+        print(str(e))
         return None
-    print(response.text)
-    update_context(my_user, other_user, response.text)
 
-def generate_rizz(relationship, chat_history, my_user, draft=None) -> str:
+
+def _process_chat_history(chat_history: list[dict[str, str]]) -> str:
     """
-    Generate a message that continues the conversation in a way that is appropriate for the user's
-    relationship with the recipient. The message should consider relevant information in the chat
-    history and imitate the user's texting conventions. If a draft message is provided, the generated
-    message should be an improved, more engaging version of the draft message.
-
-    Parameters:
-        chat_history (list of dictionaries):
-            An ordered list of messages in the chat history. Each dictionary corresponds to a
-            message and has the following keys:
-            - "type": The type of message, which can be "text" or "image"
-            - "sender": The sender of the message.
-            - "content": The message content.
-        relationship (str): The user's relationship to the recipient.
+    Processes the messages in the chat history, and formats them according to the
+    prompt design.
+    
+    chat_history (list of dictionaries):
+        An ordered list of messages in the chat history. Each dictionary corresponds to a
+        message and has the following keys:
+        - "type": The type of message, which can be "text" or "image"
+        - "sender": The sender of the message.
+        - "content": The message content.
+    
+    Returns a string containing the properly formatted chat history.
     """
-
-    chat_history_string = process_chat_history(chat_history)
-
-    if draft:
-        prompt = f"Relationship: {relationship}\nGenerate a message as: {my_user}\nChat History:\n{chat_history_string}\nDraft Message: {draft}"
-    else:
-        prompt = f"Relationship: {relationship}\nGenerate a message as: {my_user}\nChat History:\n{chat_history_string}"
-    
-    # print(prompt)
-
-    try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        model_id = "gemini-3-flash-preview"
-        response = client.models.generate_content(
-            model=model_id,
-            contents=[types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=prompt)]
-            )],
-            config=types.GenerateContentConfig(
-                system_instruction=types.Part.from_text(
-                    text=DRAFT_INSTRUCT if draft else NO_DRAFT_INSTRUCT
-                ),
-                temperature=1.5,
-                max_output_tokens=600,
-                response_mime_type="text/plain",
-                top_p=0.95,
-                top_k=40
-            )
-        )
-    except Exception as e:
-        print("Error:", e)
-        return None
-    
-    return response.text
-
-def process_chat_history(chat_history):
-    # Process messages in the chat history into a prompt
     processed_messages = []
     for message in chat_history:
         if message["type"] == "image":
-            description = describe_image(message['content'])
+            description = _describe_image(message['content'])
             if description:  # Only add the description if it is not empty, else ignore the link
                 processed_messages.append(f"{message['sender']}: {description}")
         elif message["type"] == "text":
             processed_messages.append(f"{message['sender']}: {message['content']}")
     return '\n'.join(processed_messages)
-
-def test_describe_image():
-    url = "https://instagram.fphl1-1.fna.fbcdn.net/v/t51.2885-15/485067168_18512192929008508_1371499067344772488_n.jpg?stp=dst-jpg_e35_s1080x1080_sh0.08_tt6&_nc_ht=instagram.fphl1-1.fna.fbcdn.net&_nc_cat=1&_nc_oc=Q6cZ2QHfDdt2gmQXKGZWgsu0AM3kWkB7FR0i62UNg74Z7zHh3SujFP9XKgIVapHeOXzlLDA&_nc_ohc=k2Jj_uOWwRUQ7kNvgEkCb1E&_nc_gid=zfCi6Rj8DV2VcmDLBgC0sA&edm=ANTKIIoBAAAA&ccb=7-5&oh=00_AYH4ydwuNgQeQhH2fG5dVy45wKqdN0hNExkKc1MtSuTjgw&oe=67E4EE2E&_nc_sid=d885a2"
-    response = describe_image(url)
-    print(response)
-
-def test_generate_rizz():
-    test_chat_history = [
-        {"type": "text", "sender": "user", "content": "ayyy the new Avengers movie came out!"},
-        {"type": "text", "sender": "clkr", "content": "omg ya I saw!"},
-        {"type": "text", "sender": "clkr", "content": "I can't wait to watch it"}
-    ]
-    test_relationship = "crush"
-    test_draft = "let's watch it together"
-
-    response = generate_rizz(test_relationship, test_chat_history, test_draft)
-    print(response)
-
-def test_generate_rizz_advanced():
-    test_chat_history = [
-        {"type": "text", "sender": "user", "content": "ayyy the new Avengers movie came out!"},
-        {"type": "text", "sender": "clkr", "content": "omg ya I saw!"},
-        {"type": "text", "sender": "clkr", "content": "I can't wait to watch it"},
-        {"type": "text", "sender": "clkr", "content": "wdy think of this?"},
-        {"type": "image", "sender": "clkr", "content": "https://media.discordapp.net/attachments/646750685928488990/1353182130452041759/image.png?ex=67e0b890&is=67df6710&hm=8c83542c27265e8451e56f9c6bc692cf95e1002d531ec5bc247347557dcccfa5&=&format=webp&quality=lossless&width=518&height=474"}
-    ]
-    test_relationship = "crush"
-
-    response = generate_rizz(test_relationship, test_chat_history)
-    print(response)
-
-if __name__ == "__main__":
-    # test_generate_rizz()
-    # test_describe_image()
-    test_generate_rizz_advanced()
