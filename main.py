@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, render_template, request
 from flask_cors import CORS
-from gemini import generate_rizz, gemini_transcribe
+from gemini import generate_rizz, update_description
 from google import genai
 
 app = Flask(__name__)
@@ -32,8 +32,18 @@ def rizzify():
             chat_history.append({"type": "text", "sender": msg.get('username'), "content": msg.get('message')})
 
     print(chat_history)
+
+    other_user = data.get('other_username')
+    for message in chat_history:
+        if message['sender'] != other_user:
+            my_user = message['sender']
+
+    print("Me: " + my_user)
+    print("Other: " + other_user)
+
+    update_description(chat_history, my_user, other_user)
     
-    return_msg = generate_rizz(relationship, chat_history, current_message)
+    return_msg = generate_rizz(relationship, chat_history, my_user, current_message)
     print("return: " + return_msg)
     if return_msg is None:
         return jsonify({"status": "error", "msg": "Failed to generate a message."})

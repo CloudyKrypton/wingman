@@ -3,6 +3,7 @@ from google.genai import types
 import requests
 from PIL import Image
 from io import BytesIO
+from sql import exists_context, get_context, update_context
 
 with open("apikey.txt", "r") as file:
     GEMINI_API_KEY = file.read().strip()
@@ -57,19 +58,21 @@ NO_DRAFT_INSTRUCT = """
 
     Example Input 1:
     Relationship: girlfriend
+    Generate a message as: alex
     Chat History:
-    user: yo bb girl, wya?
+    alex: yo bb girl, wya?
     clkr: at the library lol
     clkr: why?
-    user: are you coming to the party tonight?
+    alex: are you coming to the party tonight?
 
     Example Output 1:
     i was hoping to see you there :p
 
     Example Input 2:
     Relationship: co-worker
+    Generate a message as: emily
     Chat History:
-    user: Hi John, did you finish writing the docstrings?
+    emily: Hi John, did you finish writing the docstrings?
     john: No, not yet
     john: Sorry, I've been really swamped lately.
     john: I'm not sure if I'll be able to work on it before Sunday
@@ -81,18 +84,72 @@ DESCRIBE_IMG_INSTRUCT = """
     Given an image, generate a detailed description of the image. Format the in the following manner:
     "an image depicting [description of the image]."
     """
+GENERATE_HIST_INSTRUCT = """
+    You are given a small snippet of a conversation between two people with no prior context.
+    Generate 1-3 points for the specified person, related to facts they shared (e.g., name, 
+    preferences, hobbies). The goal is to eventually build persistent memory about this person in a string.
 
-def gemini_transcribe(filename: str):
+    Example Input 1:
+    Generate memory for: Alex
+    Chat history:
+    Alex: Hey! Are you still up for hiking this weekend?
+    Jordan: Hey! Yeah, definitely. Which trail were you thinking?
+    Alex: I was thinking Eagle Rock. It’s a bit challenging but the view is worth it.
+    Jordan: Sounds perfect. Should we meet at 8 am at the parking lot?
+    Alex: 8 am works! I’ll bring some snacks for the trail.
 
-    myfile = client.files.upload(file=filename)
-    prompt = 'Generate a transcript of the speech.'
+    Example Output 1:
+    Likes hiking,
+    Open to moderately challenging trails,
+    Plans and brings snacks for friends
 
-    response = client.models.generate_content(
-      model='gemini-3-flash-preview',
-      contents=[prompt, myfile]
-    )
+    Example Input 2:
+    Generate memory for: Riley
+    Chat history:
+    Sam: just saw a squirrel steal a chip lol
+    Riley: No way! Where?
+    Sam: downtown park, right under the fountain
+    Riley: That’s wild. Did it run away with it?
+    Sam: yep… like a tiny furry ninja
 
-    return (response.text)
+    Example Output 2:
+    Curious and responsive,
+    Engages with humor and asks follow-up questions
+    """
+UPDATE_HIST_INSTRUCT = """
+    You are given a small snippet of a conversation between two people with some points of prior context.
+    Update the prior context for the specified person (keeping it at 3 points maximum), related to facts they shared 
+    (e.g., name, preferences, hobbies). Prioritize specific details, such as hobbies, over more abstract
+    descriptions. The goal is to eventually build persistent memory about this person in a string.
+
+    Example Input 1:
+    Update memory for: Alex
+    Previous context: Likes hiking,Open to moderately challenging trails,Plans and brings snacks for friends
+    Chat history:
+    Alex: Tried making homemade pasta tonight. Disaster
+    Jordan: Haha! What happened?
+    Alex: Dough stuck to everything… even the cat almost got some.
+    Jordan: Yikes! At least you tried. Did it taste okay?
+    Alex: Surprisingly, yes! Just… crunchy edges and flour everywhere.
+
+    Example Output 1:
+    Likes hiking,
+    Open to moderately challenging trails,
+    Has a cat
+
+    Example Input 2:
+    Generate memory for: Riley
+    Previous context: Curious and responsive,Engages with humor and asks follow-up questions
+    Riley: finally got my hands on that new lens!
+    Sam: nice
+    Sam: which one did u get?
+    Riley: 50mm f/1.8 can’t wait to try some night shots.
+
+    Example Output 2:
+    Curious and responsive,
+    Engages with humor and asks follow-up questions
+    Enjoys photography
+    """
 
 def describe_image(url: str) -> str:
     try:
@@ -121,8 +178,42 @@ def describe_image(url: str) -> str:
     
     except Exception as e:
         return str(e)
-    
-def generate_rizz(relationship, chat_history, draft=None) -> str:
+
+def update_description(chat_history, my_user, other_user):
+    chat_history_string = process_chat_history(chat_history)
+    old_hist_exists = exists_context(my_user, other_user)
+    if not old_hist_exists:
+        prompt = f"Generate memory for: {other_user}\nChat History:\n{chat_history_string}"
+    else:
+        old_hist = get_context(my_user, other_user)
+        prompt = f"Generate memory for: {other_user}\nPrevious Context: {old_hist}\nChat History:\n{chat_history_string}"
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        model_id = "gemini-3-flash-preview"
+        response = client.models.generate_content(
+            model=model_id,
+            contents=[types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=prompt)]
+            )],
+            config=types.GenerateContentConfig(
+                system_instruction=types.Part.from_text(
+                    text=UPDATE_HIST_INSTRUCT if exists_context else GENERATE_HIST_INSTRUCT
+                ),
+                temperature=1.5,
+                max_output_tokens=600,
+                response_mime_type="text/plain",
+                top_p=0.95,
+                top_k=40
+            )
+        )
+    except Exception as e:
+        print("Error:", e)
+        return None
+    print(response.text)
+    update_context(my_user, other_user, response.text)
+
+def generate_rizz(relationship, chat_history, my_user, draft=None) -> str:
     """
     Generate a message that continues the conversation in a way that is appropriate for the user's
     relationship with the recipient. The message should consider relevant information in the chat
@@ -142,11 +233,11 @@ def generate_rizz(relationship, chat_history, draft=None) -> str:
     chat_history_string = process_chat_history(chat_history)
 
     if draft:
-        prompt = f"Relationship: {relationship}\nChat History:\n{chat_history_string}\nDraft Message: {draft}"
+        prompt = f"Relationship: {relationship}\nGenerate a message as: {my_user}\nChat History:\n{chat_history_string}\nDraft Message: {draft}"
     else:
-        prompt = f"Relationship: {relationship}\nChat History:\n{chat_history_string}"
+        prompt = f"Relationship: {relationship}\nGenerate a message as: {my_user}\nChat History:\n{chat_history_string}"
     
-    print(prompt)
+    # print(prompt)
 
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)

@@ -56,6 +56,8 @@ async function prepForRizz() {
 
           console.log("Messages object:", messages);
 
+          messages.other_username = document.title.split('@')[1];
+
           fetch("http://127.0.0.1:8000/rizzify", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
